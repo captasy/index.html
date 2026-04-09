@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JRC JAN-9201 ECDIS Simulator — CASY SIMULATIONS</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: #060e06; font-family: 'Courier New', monospace; overflow: hidden; }
+
+  .ecdis-container {
+    width: 100vw;
+    height: 100vh;
+    background: #0d1a0d;
+    border: 2px solid #1a3a1a;
+    display: flex;
+    flex-direction: column;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+  }
+
+  /* TOP BAR */
+  .top-bar {
+    background: #0a120a;
+    border-bottom: 1px solid #1a3a1a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 8px;
+    height: 28px;
+    flex-shrink: 0;
+  }
+  .top-bar .brand { color: #00cc44; font-size: 12px; font-weight: bold; letter-spacing: 2px; }
+  .top-bar .model { color: #669966; font-size: 10px; }
+  .top-bar .datetime { color: #00ff55; font-size: 11px; font-weight: bold; }
+  .top-bar .alert-strip {
+    background: transparent;
+    color: #ffaa00;
+    font-size: 10px;
+    padding: 1px 6px;
+    border: 1px solid #ffaa00;
+    display: flex; gap: 8px;
+  }
+
+  /* MAIN LAYOUT */
+  .main-area {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* LEFT TOOLBAR */
+  .left-toolbar {
+    width: 38px;
+    background: #080f08;
+    border-right: 1px solid #1a3a1a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 0;
+    gap: 3px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .lt-btn {
+    width: 30px; height: 24px;
+    background: #0f1f0f;
+    border: 1px solid #1a4a1a;
+    color: #00cc44;
+    font-size: 8px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 2px;
+    text-align: center;
+    line-height: 1.1;
+    transition: background 0.1s;
+    flex-shrink: 0;
+  }
+  .lt-btn:hover { background: #1a3a1a; }
+  .lt-btn.active { background: #003300; border-color: #00cc44; color: #00ff55; }
+  .lt-sep { width: 24px; height: 1px; background: #1a3a1a; margin: 2px 0; flex-shrink: 0; }
+
+  /* CHART AREA */
+  .chart-wrapper {
+    flex: 1;
+    position: relative;
+    background: #001a33;
+    overflow: hidden;
+    min-width: 0;
+  }
+  canvas#chartCanvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* CHART OVERLAYS */
+  .chart-info-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 22px;
+    background: rgba(0,10,0,0.88);
+    border-bottom: 1px solid #003a00;
+    display: flex; align-items: center;
+    padding: 0 8px; gap: 14px;
+    font-size: 10px;
+    color: #00cc44;
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+  .cib-item { display: flex; gap: 4px; white-space: nowrap; }
+  .cib-label { color: #669966; }
+  .cib-val { color: #00ff55; font-weight: bold; }
+
+  .own-ship-info {
+    position: absolute;
+    bottom: 24px; left: 4px;
+    background: rgba(0,10,0,0.92);
+    border: 1px solid #003a00;
+    padding: 4px 8px;
+    font-size: 10px;
+    color: #00cc44;
+    line-height: 1.7;
+    min-width: 120px;
+  }
+
+  .scale-indicator {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,10,0,0.85);
+    border: 1px solid #003a00;
+    padding: 2px 8px;
+    font-size: 10px;
+    color: #00ff55;
+    white-space: nowrap;
+  }
+
+  .ebl-vrm-box {
+    position: absolute;
+    top: 26px; left: 4px;
+    background: rgba(0,10,0,0.92);
+    border: 1px solid #003a00;
+    padding: 4px 8px;
+    font-size: 10px;
+    color: #00cc44;
+    line-height: 1.7;
+  }
+
+  .cursor-box {
+    position: absolute;
+    top: 26px; right: 4px;
+    background: rgba(0,10,0,0.92);
+    border: 1px solid #003a00;
+    padding: 4px 8px;
+    font-size: 10px;
+    color: #00cc44;
+    line-height: 1.7;
+  }
+
+  /* CASY SIMULATIONS BRANDING */
+  .casy-brand {
+    position: absolute;
+    bottom: 4px;
+    left: 8px;
+    font-size: 9.5px;
+    color: #ffdd00;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1.5px;
+    font-weight: bold;
+    opacity: 0.85;
+    pointer-events: none;
+    text-shadow: 0 0 6px rgba(255,220,0,0.3);
+  }
+
+  .mob-marker {
+    display: none;
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%,-50%);
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 2px solid red;
+    background: rgba(255,0,0,0.2);
+    animation: mobFlash 0.8s infinite;
+  }
+  @keyframes mobFlash { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  .hup-indicator {
+    position: absolute;
+    top: 26px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,10,0,0.88);
+    border: 1px solid #003a00;
+    padding: 1px 8px;
+    font-size: 9px;
+    color: #669966;
+    white-space: nowrap;
+  }
+
+  /* RIGHT INFO PANEL */
+  .right-panel {
+    width: 196px;
+    background: #060e06;
+    border-left: 1px solid #1a3a1a;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .tab-bar { display: flex; border-bottom: 1px solid #1a3a1a; flex-shrink: 0; }
+  .tab {
+    flex: 1; padding: 4px 2px; font-size: 9px; text-align: center;
+    color: #669966; cursor: pointer; border-right: 1px solid #1a3a1a;
+    transition: background 0.1s; white-space: nowrap;
+  }
+  .tab:last-child { border-right: none; }
+  .tab.active { background: #0d200d; color: #00ff55; border-bottom: 1px solid #00cc44; }
+  .tab:hover { background: #0a180a; }
+
+  .panel-section { display: none; overflow-y: auto; flex: 1; }
+  .panel-section.active { display: block; }
+
+  .rp-section { border-bottom: 1px solid #1a3a1a; padding: 4px 8px; }
+  .rp-title {
+    color: #669966; font-size: 9px; letter-spacing: 1px;
+    text-transform: uppercase; margin-bottom: 3px;
+    border-bottom: 1px solid #1a3a1a; padding-bottom: 2px;
+  }
+  .rp-row { display: flex; justify-content: space-between; font-size: 10px; margin: 1px 0; }
+  .rp-key { color: #669966; }
+  .rp-val { color: #00ff55; font-weight: bold; }
+  .rp-val.warn { color: #ffaa00; }
+  .rp-val.alarm { color: #ff4444; }
+  .rp-val.normal { color: #00ff55; }
+
+  .ais-target {
+    display: flex; flex-direction: column;
+    border: 1px solid #1a3a1a; padding: 3px 5px; margin: 2px 0;
+    background: #0a150a; cursor: pointer; font-size: 9px;
+    border-radius: 2px; transition: background 0.1s;
+  }
+  .ais-target:hover { background: #0d200d; border-color: #00aa33; }
+  .ais-target.selected { border-color: #00ff55; background: #001a00; }
+  .ais-name { color: #00ff55; font-size: 10px; font-weight: bold; }
+  .ais-info { color: #669966; }
+
+  .alert-item {
+    display: flex; align-items: flex-start; gap: 4px;
+    padding: 3px 0; border-bottom: 1px solid #1a2a1a; font-size: 9px;
+  }
+  .alert-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 2px; flex-shrink: 0; }
+  .dot-warn { background: #ffaa00; }
+  .dot-alarm { background: #ff4444; animation: mobFlash 1s infinite; }
+  .dot-ok { background: #00cc44; }
+  .alert-text { color: #cccccc; line-height: 1.4; }
+
+  .conning-mini {
+    background: #0a120a; border: 1px solid #1a4a1a;
+    padding: 4px; margin: 3px 0; border-radius: 2px;
+  }
+  .conning-label { color: #669966; font-size: 8px; }
+  .conning-bar-bg { height: 8px; background: #0d1a0d; border: 1px solid #1a3a1a; position: relative; margin: 2px 0; }
+  .conning-bar-fill { height: 100%; background: #00aa33; transition: width 0.5s; }
+  .conning-val { color: #00ff55; font-size: 10px; font-weight: bold; text-align: right; }
+
+  .rudder-gauge {
+    position: relative; height: 18px; background: #0d1a0d;
+    border: 1px solid #1a3a1a; margin: 2px 0; display: flex; align-items: center; overflow: hidden;
+  }
+  .rudder-center { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #003a00; }
+  .rudder-fill { position: absolute; top: 0; bottom: 0; background: #00aa55; transition: all 0.3s; }
+  .rudder-text { position: absolute; width: 100%; text-align: center; font-size: 10px; font-weight: bold; color: #00ff55; z-index: 1; }
+
+  .wind-compass {
+    width: 60px; height: 60px; border-radius: 50%; border: 1px solid #1a4a1a;
+    background: #080f08; position: relative; margin: 4px auto;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .compass-n { position: absolute; top: 2px; left: 50%; transform: translateX(-50%); font-size: 8px; color: #ff6666; }
+  .compass-s { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); font-size: 7px; color: #669966; }
+  .compass-e { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); font-size: 7px; color: #669966; }
+  .compass-w { position: absolute; left: 3px; top: 50%; transform: translateY(-50%); font-size: 7px; color: #669966; }
+  .hdg-arrow { width: 2px; height: 22px; background: #00ff55; position: absolute; bottom: 50%; left: calc(50% - 1px); transform-origin: bottom center; border-radius: 1px 1px 0 0; }
+  .wind-arrow { width: 2px; height: 17px; background: #ffaa00; position: absolute; bottom: 50%; left: calc(50% - 1px); transform-origin: bottom center; border-radius: 1px 1px 0 0; opacity: 0.85; }
+
+  /* RIGHT TOOLBAR */
+  .right-toolbar {
+    width: 38px;
+    background: #080f08;
+    border-left: 1px solid #1a3a1a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 0;
+    gap: 3px;
+    flex-shrink: 0;
+  }
+  .rt-btn {
+    width: 30px; height: 24px;
+    background: #0f1f0f; border: 1px solid #1a4a1a;
+    color: #00cc44; font-size: 7.5px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 2px; text-align: center; line-height: 1.1;
+    transition: background 0.1s;
+  }
+  .rt-btn:hover { background: #1a3a1a; }
+  .rt-btn.mob-active { background: #3a0000; border-color: #ff4444; color: #ff6666; }
+  .rt-btn.bright { background: #003300; border-color: #00cc44; }
+
+  /* BOTTOM CONTROL PANEL */
+  .bottom-panel {
+    background: #080f08;
+    border-top: 1px solid #1a3a1a;
+    display: flex;
+    align-items: stretch;
+    height: 46px;
+    flex-shrink: 0;
+    overflow-x: auto;
+  }
+  .bp-section {
+    display: flex; align-items: center;
+    padding: 0 6px; gap: 4px;
+    border-right: 1px solid #1a3a1a;
+    flex-shrink: 0;
+  }
+  .bp-label { color: #669966; font-size: 8px; }
+
+  .ctrl-btn {
+    height: 30px; min-width: 36px;
+    background: #0d1f0d; border: 1px solid #1a4a1a;
+    color: #00cc44; font-size: 8px; cursor: pointer;
+    border-radius: 2px; padding: 0 5px;
+    font-family: 'Courier New', monospace;
+    transition: background 0.1s; white-space: nowrap;
+  }
+  .ctrl-btn:hover { background: #1a3a1a; }
+  .ctrl-btn:active { background: #003a00; transform: scale(0.97); }
+  .ctrl-btn.toggled { background: #003300; border-color: #00cc44; color: #00ff55; }
+  .zoom-btn { width: 30px; font-size: 16px; font-weight: bold; }
+  .silence-btn { background: #331a00; border-color: #cc6600; color: #ffaa00; }
+  .ack-btn { background: #200020; border-color: #cc00cc; color: #ff66ff; }
+
+  /* STATUS BAR */
+  .status-bar {
+    background: #050c05; border-top: 1px solid #0f1f0f;
+    height: 18px; display: flex; align-items: center;
+    padding: 0 8px; gap: 14px; font-size: 9px; color: #669966;
+    flex-shrink: 0; overflow: hidden;
+  }
+  .status-ok { color: #00cc44; }
+  .status-warn { color: #ffaa00; }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none; position: absolute; inset: 0;
+    background: rgba(0,10,0,0.88);
+    align-items: center; justify-content: center; z-index: 200;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: #0a150a; border: 1px solid #00cc44;
+    padding: 12px 16px; min-width: 220px; max-width: 340px;
+    font-size: 11px; color: #00cc44; max-height: 80vh; overflow-y: auto;
+  }
+  .modal-title {
+    color: #00ff55; font-size: 12px; font-weight: bold;
+    border-bottom: 1px solid #003a00; padding-bottom: 6px;
+    margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-close { background: none; border: none; color: #ff6666; cursor: pointer; font-size: 16px; font-family: monospace; }
+  .modal-note { color: #ffaa00; font-size: 9px; margin-top: 8px; border-top: 1px solid #1a3a1a; padding-top: 6px; line-height: 1.5; }
+
+  /* HELP BOX */
+  .help-box {
+    position: absolute; bottom: 56px; right: 44px;
+    background: #0a150a; border: 1px solid #00cc44;
+    padding: 8px; max-width: 210px; font-size: 9px; color: #00cc44;
+    z-index: 150; display: none;
+  }
+  .help-box.open { display: block; }
+  .help-title { color: #00ff55; font-weight: bold; margin-bottom: 5px; font-size: 10px; }
+  .help-line { margin: 2px 0; color: #99cc99; }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #080f08; }
+  ::-webkit-scrollbar-thumb { background: #1a4a1a; border-radius: 2px; }
+
+  /* ─── ENGINE TELEGRAPH & HELM CONSOLE ─────────────────────────────── */
+  .bridge-console {
+    background: #060e06;
+    border-top: 2px solid #1a5a1a;
+    display: flex;
+    align-items: stretch;
+    height: 160px;
+    flex-shrink: 0;
+    overflow-x: auto;
+    gap: 0;
+  }
+
+  /* ENGINE TELEGRAPH */
+  .telegraph-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 14px;
+    border-right: 1px solid #1a3a1a;
+    min-width: 120px;
+    background: #070f07;
+    gap: 4px;
+  }
+  .telegraph-title {
+    color: #ffdd00; font-size: 8.5px; letter-spacing: 1.5px;
+    font-weight: bold; text-transform: uppercase;
+  }
+  .telegraph-body {
+    position: relative;
+    width: 54px; height: 108px;
+    background: #0a140a;
+    border: 1.5px solid #1a4a1a;
+    border-radius: 4px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .tg-zone {
+    position: absolute; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 7px; font-weight: bold; cursor: pointer;
+    transition: background 0.15s;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #111;
+  }
+  .tg-zone:last-child { border-bottom: none; }
+  .tg-zone:hover { filter: brightness(1.4); }
+  .tg-zone.tg-active { box-shadow: inset 0 0 8px rgba(255,255,255,0.25); }
+  .tg-pointer {
+    position: absolute; right: -2px;
+    width: 0; height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-right: 9px solid #ffdd00;
+    filter: drop-shadow(0 0 4px #ffdd00);
+    transition: top 0.4s cubic-bezier(0.4,0,0.2,1);
+    z-index: 10;
+  }
+  .tg-order-display {
+    color: #ffdd00; font-size: 9.5px; font-weight: bold;
+    letter-spacing: 0.5px; text-align: center;
+    text-shadow: 0 0 6px rgba(255,220,0,0.5);
+    min-height: 14px;
+  }
+  .tg-rpm-display {
+    color: #00ff55; font-size: 9px;
+    text-align: center;
+  }
+
+  /* STEERING WHEEL */
+  .helm-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 10px;
+    border-right: 1px solid #1a3a1a;
+    min-width: 180px;
+    background: #070f07;
+    gap: 4px;
+  }
+  .helm-title {
+    color: #00ddff; font-size: 8.5px; letter-spacing: 1.5px;
+    font-weight: bold; text-transform: uppercase;
+  }
+  .wheel-container {
+    position: relative;
+    width: 96px; height: 96px;
+    cursor: grab;
+    user-select: none;
+    flex-shrink: 0;
+  }
+  .wheel-container:active { cursor: grabbing; }
+  .wheel-svg { width: 100%; height: 100%; }
+  .helm-orders {
+    display: flex; flex-direction: column; gap: 2px; width: 100%;
+  }
+  .helm-order-btn {
+    background: #0a150a; border: 1px solid #1a4a1a;
+    color: #00cc44; font-size: 8px; cursor: pointer;
+    padding: 3px 6px; font-family: 'Courier New', monospace;
+    border-radius: 2px; text-align: left;
+    transition: background 0.1s; white-space: nowrap;
+  }
+  .helm-order-btn:hover { background: #1a3a1a; border-color: #00aa33; }
+  .helm-order-btn.active-order { background: #003300; border-color: #00ff55; color: #00ff55; }
+  .helm-rudder-readout {
+    color: #00ddff; font-size: 11px; font-weight: bold;
+    letter-spacing: 1px; text-shadow: 0 0 5px rgba(0,200,255,0.4);
+  }
+
+  /* CONNING GAUGES SIDE */
+  .con-gauges-panel {
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 6px 10px; border-right: 1px solid #1a3a1a;
+    min-width: 140px; background: #070f07;
+  }
+  .con-g-title { color: #669966; font-size: 8px; letter-spacing: 1px; font-weight: bold; }
+  .con-g-row { display: flex; justify-content: space-between; font-size: 9px; align-items: center; gap: 6px; }
+  .con-g-label { color: #669966; font-size: 8px; }
+  .con-g-val { color: #00ff55; font-weight: bold; font-size: 9px; }
+  .con-g-bar-bg { flex: 1; height: 7px; background: #0d1a0d; border: 1px solid #1a3a1a; position: relative; }
+  .con-g-bar-fill { height: 100%; background: #00aa33; transition: width 0.5s; }
+
+  /* HELM ORDERS LIST PANEL */
+  .helm-log-panel {
+    display: flex; flex-direction: column;
+    padding: 6px 8px; min-width: 160px;
+    background: #070f07; gap: 2px;
+    overflow-y: auto; flex: 1;
+  }
+  .helm-log-title { color: #ffaa00; font-size: 8.5px; letter-spacing: 1px; font-weight: bold; margin-bottom: 3px; }
+  .helm-log-entry {
+    font-size: 8.5px; color: #99cc99;
+    border-bottom: 1px solid #0d1a0d; padding-bottom: 2px;
+    display: flex; gap: 6px;
+  }
+  .hle-time { color: #669966; flex-shrink: 0; }
+  .hle-cmd { color: #00ff55; flex-shrink: 0; min-width: 80px; }
+  .hle-who { color: #ffaa00; font-size: 7.5px; }
+</style>
+</head>
+<body>
+
+<div class="ecdis-container" id="mainECDIS">
+
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div>
+      <span class="brand">JRC</span>
+      <span class="model">&nbsp;JAN-9201 ECDIS</span>
+    </div>
+    <div class="alert-strip" id="alertStrip">
+      <span id="alertMsg">&#9679; SYSTEM NORMAL</span>
+    </div>
+    <div class="datetime" id="clockDisplay">UTC 00:00:00 | 2025-01-01</div>
+  </div>
+
+  <!-- MAIN AREA -->
+  <div class="main-area">
+
+    <!-- LEFT TOOLBAR -->
+    <div class="left-toolbar">
+      <div class="lt-btn active" id="btnNup" title="North-Up" onclick="setHeadingMode('NUP')">N<br>UP</div>
+      <div class="lt-btn" id="btnCup" title="Course-Up" onclick="setHeadingMode('CUP')">C<br>UP</div>
+      <div class="lt-btn" id="btnHup" title="Head-Up" onclick="setHeadingMode('HUP')">H<br>UP</div>
+      <div class="lt-sep"></div>
+      <div class="lt-btn" id="btnTM" title="True Motion" onclick="setMotion('TM')">TM</div>
+      <div class="lt-btn active" id="btnRM" title="Relative Motion" onclick="setMotion('RM')">RM</div>
+      <div class="lt-sep"></div>
+      <div class="lt-btn active" id="btnEBL" title="EBL on/off" onclick="toggleLayer('ebl')">EBL</div>
+      <div class="lt-btn active" id="btnVRM" title="VRM on/off" onclick="toggleLayer('vrm')">VRM</div>
+      <div class="lt-btn" id="btnPI" title="PI on/off" onclick="toggleLayer('pi')">PI</div>
+      <div class="lt-sep"></div>
+      <div class="lt-btn" id="btnRADAR" title="Radar overlay" onclick="toggleLayer('radar')">RDR</div>
+      <div class="lt-btn active" id="btnAIS" title="AIS display" onclick="toggleLayer('ais')">AIS</div>
+      <div class="lt-btn active" id="btnTT" title="TT display" onclick="toggleLayer('tt')">TT</div>
+      <div class="lt-sep"></div>
+      <div class="lt-btn active" id="btnROUTE" title="Route display" onclick="toggleLayer('route')">RTE</div>
+      <div class="lt-btn" title="Waypoints" onclick="openModal('waypoint')">WPT</div>
+      <div class="lt-sep"></div>
+      <div class="lt-btn" id="btnGUARD" title="Guard ring" onclick="toggleLayer('guard')">GRD</div>
+      <div class="lt-sep"></div>
+      <div class="lt-btn" title="Chart info" onclick="openModal('chart')">CHT</div>
+      <div class="lt-btn" title="Help" id="btnHelp" onclick="toggleHelp()">HLP</div>
+    </div>
+
+    <!-- CHART CANVAS AREA -->
+    <div class="chart-wrapper" id="chartWrapper">
+      <canvas id="chartCanvas"></canvas>
+
+      <div class="chart-info-bar">
+        <div class="cib-item"><span class="cib-label">LAT</span><span class="cib-val" id="dispLat">35&deg;42.3'N</span></div>
+        <div class="cib-item"><span class="cib-label">LON</span><span class="cib-val" id="dispLon">139&deg;45.8'E</span></div>
+        <div class="cib-item"><span class="cib-label">HDG</span><span class="cib-val" id="dispHdg">045&deg;</span></div>
+        <div class="cib-item"><span class="cib-label">COG</span><span class="cib-val" id="dispCog">047&deg;</span></div>
+        <div class="cib-item"><span class="cib-label">SOG</span><span class="cib-val" id="dispSog">12.4kn</span></div>
+        <div class="cib-item"><span class="cib-label">STW</span><span class="cib-val" id="dispStw">12.1kn</span></div>
+        <div class="cib-item"><span class="cib-label">DEPTH</span><span class="cib-val" id="dispDepth">48.2m</span></div>
+        <div class="cib-item"><span class="cib-label">SCALE</span><span class="cib-val" id="dispScale">1:25000</span></div>
+      </div>
+
+      <div class="hup-indicator" id="modeIndicator">N-UP &nbsp;|&nbsp; RM &nbsp;|&nbsp; ENC S-57</div>
+
+      <div class="cursor-box">
+        <div style="color:#669966;font-size:9px;margin-bottom:2px;">CURSOR</div>
+        <div class="rp-row"><span class="rp-key">LAT</span><span class="rp-val" id="curLat">35&deg;42.5'N</span></div>
+        <div class="rp-row"><span class="rp-key">LON</span><span class="rp-val" id="curLon">139&deg;46.1'E</span></div>
+        <div class="rp-row"><span class="rp-key">BRG</span><span class="rp-val" id="curBrg">052&deg;</span></div>
+        <div class="rp-row"><span class="rp-key">RNG</span><span class="rp-val" id="curRng">0.34nm</span></div>
+      </div>
+
+      <div class="ebl-vrm-box" id="eblVrmBox">
+        <div style="color:#669966;font-size:9px;margin-bottom:2px;">EBL / VRM</div>
+        <div class="rp-row"><span class="rp-key">EBL1</span><span class="rp-val" id="ebl1val">047.2&deg;</span></div>
+        <div class="rp-row"><span class="rp-key">VRM1</span><span class="rp-val" id="vrm1val">1.25nm</span></div>
+      </div>
+
+      <div class="own-ship-info">
+        <div style="color:#669966;font-size:9px;margin-bottom:2px;">OWN SHIP</div>
+        <div class="rp-row"><span class="rp-key">GPS</span><span class="rp-val">ACTIVE</span></div>
+        <div class="rp-row"><span class="rp-key">DR</span><span class="rp-val">OK</span></div>
+        <div class="rp-row"><span class="rp-key">GYRO</span><span class="rp-val" id="gyroVal">045.1&deg;</span></div>
+        <div class="rp-row"><span class="rp-key">ROT</span><span class="rp-val" id="rotVal">+0.0&deg;/m</span></div>
+      </div>
+
+      <div class="scale-indicator" id="scaleBar">|&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;| 0.5 nm</div>
+
+      <!-- CASY SIMULATIONS BRANDING -->
+      <div class="casy-brand">CASY SIMULATIONS</div>
+
+      <div class="mob-marker" id="mobMarker"></div>
+
+      <!-- MODAL -->
+      <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-box" id="modalBox">
+          <div class="modal-title">
+            <span id="modalTitle">INFO</span>
+            <button class="modal-close" onclick="closeModal()">&#10005;</button>
+          </div>
+          <div id="modalContent"></div>
+        </div>
+      </div>
+
+      <!-- HELP BOX -->
+      <div class="help-box" id="helpBox">
+        <div class="help-title">&#9632; QUICK REFERENCE</div>
+        <div class="help-line">N/C/H UP &mdash; heading mode</div>
+        <div class="help-line">TM / RM &mdash; motion mode</div>
+        <div class="help-line">EBL &mdash; electronic bearing line</div>
+        <div class="help-line">VRM &mdash; variable range marker</div>
+        <div class="help-line">PI &mdash; parallel index lines</div>
+        <div class="help-line">GRD &mdash; guard ring alarm zone</div>
+        <div class="help-line">MOB &mdash; man overboard mark</div>
+        <div class="help-line">AIS &mdash; transponder targets</div>
+        <div class="help-line">RDR &mdash; radar overlay</div>
+        <div class="help-line">ZOOM +/&minus; &mdash; chart scale</div>
+        <div class="help-line">SILENCE &mdash; mute buzzer</div>
+        <div class="help-line">ACK &mdash; acknowledge alert</div>
+        <div class="help-line">HOME &mdash; return to own ship</div>
+        <div class="help-line">CHT &mdash; chart information</div>
+        <div class="help-line">WPT &mdash; waypoint list</div>
+        <div style="border-top:1px solid #1a3a1a;margin-top:5px;padding-top:4px;color:#ffdd00;font-size:8.5px;letter-spacing:1px;">CASY SIMULATIONS &mdash; Training Use Only</div>
+      </div>
+
+    </div><!-- end chart-wrapper -->
+
+    <!-- RIGHT PANEL -->
+    <div class="right-panel">
+      <div class="tab-bar">
+        <div class="tab active" onclick="switchTab('sensor')" id="tab-sensor">SENSOR</div>
+        <div class="tab" onclick="switchTab('ais')" id="tab-ais">AIS</div>
+        <div class="tab" onclick="switchTab('alert')" id="tab-alert">ALERT</div>
+        <div class="tab" onclick="switchTab('conning')" id="tab-conning">CON</div>
+      </div>
+
+      <!-- SENSOR TAB -->
+      <div class="panel-section active" id="panel-sensor">
+        <div class="rp-section">
+          <div class="rp-title">POSITION</div>
+          <div class="rp-row"><span class="rp-key">LAT</span><span class="rp-val" id="rLat">35&deg;42.3'N</span></div>
+          <div class="rp-row"><span class="rp-key">LON</span><span class="rp-val" id="rLon">139&deg;45.8'E</span></div>
+          <div class="rp-row"><span class="rp-key">SOURCE</span><span class="rp-val">GPS 1</span></div>
+          <div class="rp-row"><span class="rp-key">ACCURACY</span><span class="rp-val">&lt;10m</span></div>
+          <div class="rp-row"><span class="rp-key">RAIM</span><span class="rp-val">IN USE</span></div>
+        </div>
+        <div class="rp-section">
+          <div class="rp-title">HEADING / SPEED</div>
+          <div class="rp-row"><span class="rp-key">HDG</span><span class="rp-val" id="rHdg">045&deg;</span></div>
+          <div class="rp-row"><span class="rp-key">HDG SRC</span><span class="rp-val">GYRO 1</span></div>
+          <div class="rp-row"><span class="rp-key">COG</span><span class="rp-val" id="rCog">047&deg;</span></div>
+          <div class="rp-row"><span class="rp-key">SOG</span><span class="rp-val" id="rSog">12.4kn</span></div>
+          <div class="rp-row"><span class="rp-key">STW</span><span class="rp-val" id="rStw">12.1kn</span></div>
+          <div class="rp-row"><span class="rp-key">ROT</span><span class="rp-val" id="rRot">+0.0&deg;/m</span></div>
+        </div>
+        <div class="rp-section">
+          <div class="rp-title">DEPTH / ENVIRONMENT</div>
+          <div class="rp-row"><span class="rp-key">DEPTH</span><span class="rp-val" id="rDepth">48.2m</span></div>
+          <div class="rp-row"><span class="rp-key">WIND</span><span class="rp-val" id="rWind">NE 14kn</span></div>
+          <div class="rp-row"><span class="rp-key">CURRENT</span><span class="rp-val" id="rCurrent">S 0.8kn</span></div>
+          <div class="rp-row"><span class="rp-key">SEA TEMP</span><span class="rp-val">18.4&deg;C</span></div>
+        </div>
+        <div class="rp-section">
+          <div class="rp-title">ROUTE MONITORING</div>
+          <div class="rp-row"><span class="rp-key">WPT</span><span class="rp-val" id="rWpt">03 / 08</span></div>
+          <div class="rp-row"><span class="rp-key">DTG</span><span class="rp-val" id="rDtg">4.2nm</span></div>
+          <div class="rp-row"><span class="rp-key">ETA</span><span class="rp-val" id="rEta">00:22</span></div>
+          <div class="rp-row"><span class="rp-key">XTE</span><span class="rp-val normal" id="rXte">0.02nm P</span></div>
+          <div class="rp-row"><span class="rp-key">SAFE CTR</span><span class="rp-val">15.0m</span></div>
+        </div>
+      </div>
+
+      <!-- AIS TAB -->
+      <div class="panel-section" id="panel-ais">
+        <div class="rp-section">
+          <div class="rp-title">AIS TARGETS (6 ACTIVE)</div>
+          <div id="aisList"></div>
+        </div>
+        <div class="rp-section" id="aisDetailSection" style="display:none;">
+          <div class="rp-title">TARGET DETAIL</div>
+          <div id="aisDetail"></div>
+        </div>
+      </div>
+
+      <!-- ALERT TAB -->
+      <div class="panel-section" id="panel-alert">
+        <div class="rp-section">
+          <div class="rp-title">ACTIVE ALERTS</div>
+          <div id="alertList"></div>
+        </div>
+      </div>
+
+      <!-- CONNING TAB -->
+      <div class="panel-section" id="panel-conning">
+        <div class="rp-section">
+          <div class="rp-title">ENGINE / PROPULSION</div>
+          <div class="conning-mini">
+            <div class="conning-label">ENGINE RPM (STBD)</div>
+            <div class="conning-bar-bg"><div class="conning-bar-fill" id="engStbd" style="width:62%"></div></div>
+            <div class="conning-val" id="engStbdVal">62 RPM</div>
+          </div>
+          <div class="conning-mini">
+            <div class="conning-label">ENGINE RPM (PORT)</div>
+            <div class="conning-bar-bg"><div class="conning-bar-fill" id="engPort" style="width:60%"></div></div>
+            <div class="conning-val" id="engPortVal">60 RPM</div>
+          </div>
+          <div class="conning-mini">
+            <div class="conning-label">RUDDER ANGLE</div>
+            <div class="rudder-gauge">
+              <div class="rudder-center"></div>
+              <div class="rudder-fill" id="rudderFill" style="left:50%;width:0%;"></div>
+              <div class="rudder-text" id="rudderText">0.0&deg;</div>
+            </div>
+          </div>
+          <div class="rp-row" style="margin-top:4px;"><span class="rp-key">ROT</span><span class="rp-val" id="conROT">+0.0&deg;/min</span></div>
+        </div>
+        <div class="rp-section">
+          <div class="rp-title">WIND / CURRENT</div>
+          <div class="wind-compass" id="windCompass">
+            <span class="compass-n">N</span>
+            <span class="compass-s">S</span>
+            <span class="compass-e">E</span>
+            <span class="compass-w">W</span>
+            <div class="hdg-arrow" id="hdgArrow"></div>
+            <div class="wind-arrow" id="windArrow"></div>
+          </div>
+          <div class="rp-row"><span class="rp-key">WIND BRG</span><span class="rp-val" id="windBrgDisp">045&deg;</span></div>
+          <div class="rp-row"><span class="rp-key">WIND SPD</span><span class="rp-val" id="windSpdDisp">14kn BFT4</span></div>
+          <div class="rp-row"><span class="rp-key">SET</span><span class="rp-val">180&deg;</span></div>
+          <div class="rp-row"><span class="rp-key">DRIFT</span><span class="rp-val">0.8kn</span></div>
+        </div>
+      </div>
+    </div><!-- end right-panel -->
+
+    <!-- RIGHT TOOLBAR -->
+    <div class="right-toolbar">
+      <div class="rt-btn bright" id="btnBright" onclick="cycleBrightness()" title="Display Brightness">BRT</div>
+      <div class="rt-btn mob-active" id="btnMOB" onclick="toggleMOB()" title="Man Overboard [MOB]">MOB</div>
+      <div style="height:4px;"></div>
+      <div class="rt-btn" onclick="openModal('daynight')" title="Day/Night Mode">D/N</div>
+      <div class="rt-btn" onclick="openModal('sensor')" title="Sensor Selection">SNS</div>
+      <div class="rt-btn" onclick="openModal('ownship')" title="Own Ship AIS Info">AIS</div>
+      <div class="rt-btn" onclick="openModal('playback')" title="Track Playback">PLY</div>
+      <div style="flex:1;"></div>
+      <div class="rt-btn" onclick="openModal('about')" title="System Info" style="color:#669966;font-size:7px;">SYS</div>
+    </div>
+
+  </div><!-- end main-area -->
+
+  <!-- BOTTOM CONTROL PANEL -->
+  <div class="bottom-panel">
+    <div class="bp-section">
+      <div class="bp-label">ZOOM</div>
+      <button class="ctrl-btn zoom-btn" onclick="changeScale(1)" title="[ZOOM IN]">+</button>
+      <button class="ctrl-btn zoom-btn" onclick="changeScale(-1)" title="[ZOOM OUT]">&minus;</button>
+    </div>
+    <div class="bp-section">
+      <div class="bp-label">HEADING MODE</div>
+      <button class="ctrl-btn toggled" onclick="setHeadingMode('NUP')" id="cb-nup">N-UP</button>
+      <button class="ctrl-btn" onclick="setHeadingMode('CUP')" id="cb-cup">C-UP</button>
+      <button class="ctrl-btn" onclick="setHeadingMode('HUP')" id="cb-hup">H-UP</button>
+      <button class="ctrl-btn" onclick="setHeadingMode('WUP')" id="cb-wup">W-UP</button>
+    </div>
+    <div class="bp-section">
+      <div class="bp-label">MOTION</div>
+      <button class="ctrl-btn" onclick="setMotion('TM')" id="cb-tm">TM</button>
+      <button class="ctrl-btn toggled" onclick="setMotion('RM')" id="cb-rm">RM</button>
+    </div>
+    <div class="bp-section">
+      <div class="bp-label">ALERT</div>
+      <button class="ctrl-btn silence-btn" onclick="silenceAlert()" title="[SILENCE] Stop buzzer">SILENCE</button>
+      <button class="ctrl-btn ack-btn" onclick="ackAlert()" title="[ALERT ACK] Acknowledge">[ACK]</button>
+    </div>
+    <div class="bp-section">
+      <div class="bp-label">NAV</div>
+      <button class="ctrl-btn" onclick="goHome()" title="[HOME] Return to own ship">HOME</button>
+    </div>
+    <div class="bp-section">
+      <div class="bp-label">D/NIGHT</div>
+      <button class="ctrl-btn" onclick="openModal('daynight')" id="dnBtn">DAY</button>
+    </div>
+    <div class="bp-section" style="border:none;">
+      <div class="bp-label">FUNCTION</div>
+      <button class="ctrl-btn" onclick="openModal('pi')" title="Parallel Index Lines">PI</button>
+      <button class="ctrl-btn" onclick="openModal('mob_detail')" title="MOB Details">MOB</button>
+      <button class="ctrl-btn" onclick="openModal('chart_maint')" title="Chart Maintenance">MAINT</button>
+      <button class="ctrl-btn" onclick="openModal('about')">INFO</button>
+    </div>
+  </div>
+
+  <!-- ═══ BRIDGE CONSOLE: ENGINE TELEGRAPH + STEERING WHEEL ═══ -->
+  <div class="bridge-console" id="bridgeConsole">
+
+    <!-- ENGINE TELEGRAPH -->
+    <div class="telegraph-panel">
+      <div class="telegraph-title">⚙ ENG. TELEGRAPH</div>
+      <div class="telegraph-body" id="telegraphBody">
+        <!-- zones filled by JS -->
+      </div>
+      <div class="tg-order-display" id="tgOrderDisplay">FULL AHEAD</div>
+      <div class="tg-rpm-display" id="tgRpmDisplay">RPM: 62</div>
+    </div>
+
+    <!-- STEERING WHEEL + HELM ORDERS -->
+    <div class="helm-panel">
+      <div class="helm-title">⛵ HELM CONTROL</div>
+      <div class="wheel-container" id="wheelContainer">
+        <svg class="wheel-svg" id="wheelSVG" viewBox="0 0 96 96">
+          <!-- Outer ring -->
+          <circle cx="48" cy="48" r="44" fill="none" stroke="#1a6a2a" stroke-width="3"/>
+          <circle cx="48" cy="48" r="38" fill="#0a150a" stroke="#1a4a1a" stroke-width="1"/>
+          <!-- Spokes (8) -->
+          <g id="wheelSpokes" stroke="#2a6a3a" stroke-width="3.5" stroke-linecap="round">
+            <line x1="48" y1="48" x2="48" y2="10"/>
+            <line x1="48" y1="48" x2="48" y2="86"/>
+            <line x1="48" y1="48" x2="10" y2="48"/>
+            <line x1="48" y1="48" x2="86" y2="48"/>
+            <line x1="48" y1="48" x2="75.7" y2="20.3"/>
+            <line x1="48" y1="48" x2="20.3" y2="75.7"/>
+            <line x1="48" y1="48" x2="75.7" y2="75.7"/>
+            <line x1="48" y1="48" x2="20.3" y2="20.3"/>
+          </g>
+          <!-- Spoke handles -->
+          <g fill="#2a8a4a">
+            <circle cx="48" cy="10" r="4"/>
+            <circle cx="48" cy="86" r="4"/>
+            <circle cx="10" cy="48" r="4"/>
+            <circle cx="86" cy="48" r="4"/>
+            <circle cx="75.7" cy="20.3" r="4"/>
+            <circle cx="20.3" cy="75.7" r="4"/>
+            <circle cx="75.7" cy="75.7" r="4"/>
+            <circle cx="20.3" cy="20.3" r="4"/>
+          </g>
+          <!-- Hub -->
+          <circle cx="48" cy="48" r="9" fill="#0d200d" stroke="#00aa33" stroke-width="1.5"/>
+          <circle cx="48" cy="48" r="4" fill="#00aa33"/>
+          <!-- Centre reference mark -->
+          <line x1="48" y1="4" x2="48" y2="8" stroke="#ffdd00" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="helm-rudder-readout" id="helmRudderReadout">MIDSHIPS &nbsp; 0.0°</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center;">
+        <button class="helm-order-btn" onclick="giveHelmOrder('HARD STBD','hard-stbd')">HARD STBD ▶▶</button>
+        <button class="helm-order-btn" onclick="giveHelmOrder('STBD 20°','stbd-20')">STBD 20°</button>
+        <button class="helm-order-btn" onclick="giveHelmOrder('STBD 10°','stbd-10')">STBD 10°</button>
+        <button class="helm-order-btn active-order" id="ho-mid" onclick="giveHelmOrder('MIDSHIPS','mid')">MIDSHIPS</button>
+        <button class="helm-order-btn" onclick="giveHelmOrder('PORT 10°','port-10')">PORT 10°</button>
+        <button class="helm-order-btn" onclick="giveHelmOrder('PORT 20°','port-20')">PORT 20°</button>
+        <button class="helm-order-btn" onclick="giveHelmOrder('HARD PORT','hard-port')">◀◀ HARD PORT</button>
+      </div>
+    </div>
+
+    <!-- CONNING GAUGES -->
+    <div class="con-gauges-panel">
+      <div class="con-g-title">▶ PROPULSION</div>
+      <div class="con-g-row">
+        <span class="con-g-label">STBD RPM</span>
+        <div class="con-g-bar-bg"><div class="con-g-bar-fill" id="bc-engStbd" style="width:62%"></div></div>
+        <span class="con-g-val" id="bc-engStbdVal">62</span>
+      </div>
+      <div class="con-g-row">
+        <span class="con-g-label">PORT RPM</span>
+        <div class="con-g-bar-bg"><div class="con-g-bar-fill" id="bc-engPort" style="width:60%"></div></div>
+        <span class="con-g-val" id="bc-engPortVal">60</span>
+      </div>
+      <div style="border-top:1px solid #1a3a1a;margin:4px 0;"></div>
+      <div class="con-g-title">▶ NAVIGATION</div>
+      <div class="con-g-row"><span class="con-g-label">SOG</span><span class="con-g-val" id="bc-sog">12.4 kn</span></div>
+      <div class="con-g-row"><span class="con-g-label">HDG</span><span class="con-g-val" id="bc-hdg">045°</span></div>
+      <div class="con-g-row"><span class="con-g-label">ROT</span><span class="con-g-val" id="bc-rot">+0.0°/m</span></div>
+      <div style="border-top:1px solid #1a3a1a;margin:4px 0;"></div>
+      <div class="con-g-title">▶ RUDDER</div>
+      <div style="position:relative;height:16px;background:#0d1a0d;border:1px solid #1a3a1a;margin:2px 0;">
+        <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:#003a00;"></div>
+        <div id="bc-rudderFill" style="position:absolute;top:0;bottom:0;left:50%;width:0;background:#00aa55;transition:all 0.3s;"></div>
+        <div id="bc-rudderText" style="position:absolute;width:100%;text-align:center;font-size:9px;font-weight:bold;color:#00ff55;line-height:16px;">0.0°</div>
+      </div>
+    </div>
+
+    <!-- HELM ORDERS LOG -->
+    <div class="helm-log-panel">
+      <div class="helm-log-title">📋 HELM ORDERS LOG</div>
+      <div id="helmOrdersLog">
+        <div class="helm-log-entry"><span class="hle-time">--:--</span><span class="hle-cmd">MIDSHIPS</span><span class="hle-who">PILOT</span></div>
+      </div>
+    </div>
+
+  </div><!-- end bridge-console -->
+
+  <!-- STATUS BAR -->
+  <div class="status-bar">
+    <span class="status-ok">&#9679; GPS1 OK</span>
+    <span class="status-ok">&#9679; GYRO1 OK</span>
+    <span class="status-ok">&#9679; LOG OK</span>
+    <span class="status-ok">&#9679; AIS OK</span>
+    <span class="status-ok">&#9679; S-57 ENC LOADED</span>
+    <span class="status-ok">&#9679; MSC.232(82) COMPLIANT</span>
+    <span style="flex:1;"></span>
+    <span id="statusMsg" class="status-ok">SYSTEM NORMAL &mdash; TRAINING MODE</span>
+  </div>
+
+</div><!-- end ecdis-container -->
+
+<script>
+const scales = ['1:5000','1:10000','1:25000','1:50000','1:100000','1:200000','1:500000'];
+const scaleNm = [0.1,0.2,0.5,1,2,5,10];
+let scaleIdx = 2;
+let headingMode = 'NUP';
+let motionMode = 'RM';
+let layers = { ebl:true, vrm:true, pi:false, radar:false, ais:true, tt:true, route:true, guard:false };
+let mobActive = false;
+let dnMode = 'DAY';
+let heading = 45, cog = 47, sog = 12.4, stw = 12.1, depth = 48.2, rudder = 0, rpm = 62;
+let eblAngle = 47.2, vrmRange = 1.25;
+let selectedAIS = null;
+let frame = 0;
+
+const aisTargets = [
+  { id:1, name:'PACIFIC GLORY',  mmsi:'431012345', callsign:'JKPG', cog:220, sog:8.5,  brg:15,  range:1.2, hdg:218, rot:0, navStatus:0, type:71, len:185, draft:9.2,  dest:'TOKYO' },
+  { id:2, name:'SILVER STAR',    mmsi:'636012345', callsign:'ELSS', cog:85,  sog:14.2, brg:78,  range:2.4, hdg:87,  rot:0, navStatus:0, type:80, len:228, draft:11.4, dest:'CHIBA' },
+  { id:3, name:'HAKUSAN MARU',   mmsi:'431023456', callsign:'JKHM', cog:10,  sog:5.2,  brg:145, range:0.8, hdg:12,  rot:0, navStatus:0, type:70, len:98,  draft:5.1,  dest:'YOKOHAMA' },
+  { id:4, name:'COAST GUARD 12', mmsi:'431099001', callsign:'JCGX', cog:330, sog:18.0, brg:200, range:3.1, hdg:328, rot:0, navStatus:3, type:55, len:96,  draft:3.8,  dest:'PATROL' },
+  { id:5, name:'MT FUJI MARU',   mmsi:'431034567', callsign:'JKFM', cog:180, sog:2.1,  brg:60,  range:5.2, hdg:182, rot:0, navStatus:5, type:70, len:142, draft:7.2,  dest:'YOKOHAMA' },
+  { id:6, name:'TAIYO PILOT',    mmsi:'431001001', callsign:'JKTP', cog:270, sog:11.2, brg:315, range:1.8, hdg:268, rot:0, navStatus:0, type:50, len:28,  draft:1.8,  dest:'PILOT STN' },
+];
+
+const navStatusTxt = {0:'Under Way Engine',1:'At Anchor',2:'Not Under Command',3:'Restricted Maneuv.',4:'By Draught',5:'Moored',6:'Aground',7:'Fishing',8:'Under Way Sail',50:'Pilot Vessel',55:'Law Enforcement'};
+const shipTypeTxt = {50:'Pilot Vessel',55:'Law Enforcement',70:'Cargo',71:'Cargo (Gen)',80:'Tanker'};
+function getShipType(t){ return shipTypeTxt[t]||(t>=70&&t<=79?'Cargo':t>=80&&t<=89?'Tanker':t>=60&&t<=69?'Passenger':'Other'); }
+
+const alerts = [
+  { level:'alarm', text:'XTE exceeds 0.1nm limit — off route port side' },
+  { level:'warn',  text:'Safety contour approaching — WPT 04 area, depth <15m' },
+  { level:'ok',    text:'CPA HAKUSAN MARU — 0.4nm in 08 min (AIS ID:3)' },
+  { level:'ok',    text:'WPT 03 passed — next WPT 04, DTG 4.2nm' },
+];
+
+// Clock
+function updateClock(){
+  const t = new Date();
+  const p = n=>String(n).padStart(2,'0');
+  document.getElementById('clockDisplay').textContent =
+    `UTC ${p(t.getUTCHours())}:${p(t.getUTCMinutes())}:${p(t.getUTCSeconds())} | ${t.getUTCFullYear()}-${p(t.getUTCMonth()+1)}-${p(t.getUTCDate())}`;
+}
+
+// Sensor animation
+function animateSensors(){
+  heading += (Math.random()-0.5)*0.25; heading=((heading%360)+360)%360;
+  cog = heading+(Math.random()-0.5)*2; cog=((cog%360)+360)%360;
+  sog += (Math.random()-0.5)*0.06; sog=Math.max(11.5,Math.min(13.5,sog));
+  stw = sog-0.3+(Math.random()-0.5)*0.1;
+  depth += (Math.random()-0.5)*0.6; depth=Math.max(20,Math.min(80,depth));
+  rudder += (Math.random()-0.5)*0.6; rudder=Math.max(-6,Math.min(6,rudder));
+  rpm += (Math.random()-0.5)*0.4; rpm=Math.max(55,Math.min(70,rpm));
+  eblAngle += (Math.random()-0.5)*0.15; eblAngle=((eblAngle%360)+360)%360;
+
+  const fmtHdg = v=>String(Math.round(v)).padStart(3,'0')+'°';
+  ['dispHdg','rHdg'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=fmtHdg(heading);});
+  ['dispCog','rCog'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=fmtHdg(cog);});
+  ['dispSog','rSog'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=sog.toFixed(1)+'kn';});
+  ['dispStw','rStw'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=stw.toFixed(1)+'kn';});
+  ['dispDepth','rDepth'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=depth.toFixed(1)+'m';});
+  document.getElementById('gyroVal').textContent=heading.toFixed(1)+'°';
+  document.getElementById('rotVal').textContent=(rudder>0?'+':'')+(rudder*0.1).toFixed(1)+'°/m';
+  document.getElementById('rRot').textContent=(rudder>0?'+':'')+(rudder*0.1).toFixed(1)+'°/m';
+  document.getElementById('ebl1val').textContent=eblAngle.toFixed(1)+'°';
+  const rpmPct=Math.min(100,((rpm-40)/40*100));
+  document.getElementById('engStbd').style.width=rpmPct+'%';
+  document.getElementById('engStbdVal').textContent=Math.round(rpm)+' RPM';
+  document.getElementById('engPort').style.width=Math.max(0,rpmPct-3)+'%';
+  document.getElementById('engPortVal').textContent=Math.round(rpm-2)+' RPM';
+  document.getElementById('conROT').textContent=(rudder>0?'+':'')+(rudder*0.1).toFixed(1)+'°/min';
+  const rPct=Math.abs(rudder)/35*50;
+  const rf=document.getElementById('rudderFill');
+  if(rudder>=0){rf.style.left='50%';rf.style.width=rPct+'%';rf.style.background='#00aa55';}
+  else{rf.style.left=(50-rPct)+'%';rf.style.width=rPct+'%';rf.style.background='#aa5500';}
+  document.getElementById('rudderText').textContent=rudder.toFixed(1)+'°';
+  document.getElementById('hdgArrow').style.transform='rotate('+heading+'deg)';
+  document.getElementById('windArrow').style.transform='rotate(45deg)';
+}
+
+// Canvas
+const canvas=document.getElementById('chartCanvas');
+const ctx=canvas.getContext('2d');
+
+function resizeCanvas(){
+  const w=document.getElementById('chartWrapper');
+  canvas.width=w.clientWidth; canvas.height=w.clientHeight; drawChart();
+}
+
+function drawChart(){
+  const W=canvas.width, H=canvas.height;
+  if(!W||!H) return;
+  ctx.clearRect(0,0,W,H);
+
+  // Sea
+  ctx.fillStyle='#001a33'; ctx.fillRect(0,0,W,H);
+
+  // Land (simplified Japan coast)
+  ctx.fillStyle='#1a2e1a';
+  ctx.beginPath();
+  ctx.moveTo(W*0.72,0); ctx.lineTo(W,0); ctx.lineTo(W,H*0.45);
+  ctx.lineTo(W*0.88,H*0.22); ctx.lineTo(W*0.78,H*0.18);
+  ctx.lineTo(W*0.74,H*0.06); ctx.closePath(); ctx.fill();
+  // Smaller land
+  ctx.beginPath();
+  ctx.moveTo(W*0.6,0); ctx.lineTo(W*0.72,0); ctx.lineTo(W*0.74,H*0.06);
+  ctx.lineTo(W*0.68,H*0.10); ctx.lineTo(W*0.62,H*0.04); ctx.closePath(); ctx.fill();
+
+  // Shallow water
+  ctx.fillStyle='#001e3a';
+  ctx.beginPath(); ctx.ellipse(W*0.52,H*0.68,W*0.22,H*0.18,0,0,Math.PI*2); ctx.fill();
+
+  // Depth contours
+  ctx.lineWidth=0.8;
+  [['#003a6a',0.13,0.10],['#003060',0.20,0.14],['#002850',0.28,0.19]].forEach(([c,rx,ry])=>{
+    ctx.strokeStyle=c; ctx.beginPath();
+    ctx.ellipse(W*0.52,H*0.68,W*rx,H*ry,0.2,0,Math.PI*2); ctx.stroke();
+  });
+
+  // Safety contour
+  ctx.strokeStyle='#0044aa'; ctx.lineWidth=1.8; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(W*0.28,H*0.08);
+  ctx.quadraticCurveTo(W*0.42,H*0.42,W*0.48,H*0.88); ctx.stroke();
+
+  // Danger area
+  ctx.strokeStyle='#550000'; ctx.lineWidth=0.5; ctx.setLineDash([3,3]);
+  for(let i=0;i<7;i++){ ctx.beginPath(); ctx.moveTo(W*0.50+i*9-30,H*0.52); ctx.lineTo(W*0.50+i*9-30+18,H*0.66); ctx.stroke(); }
+  ctx.setLineDash([]);
+
+  // Route
+  if(layers.route){
+    const wpts=[[W*0.18,H*0.82],[W*0.32,H*0.62],[W*0.46,H*0.47],[W*0.54,H*0.32],[W*0.62,H*0.20]];
+    ctx.strokeStyle='#ff8800'; ctx.lineWidth=1.5; ctx.setLineDash([7,3]);
+    ctx.beginPath(); ctx.moveTo(wpts[0][0],wpts[0][1]);
+    wpts.forEach(w=>ctx.lineTo(w[0],w[1])); ctx.stroke(); ctx.setLineDash([]);
+    wpts.forEach((w,i)=>{
+      ctx.strokeStyle='#ff8800'; ctx.lineWidth=1.2;
+      ctx.strokeRect(w[0]-4,w[1]-4,8,8);
+      ctx.fillStyle='#ff8800'; ctx.font='9px Courier New';
+      ctx.fillText('W'+String(i+1).padStart(2,'0'),w[0]+7,w[1]+4);
+    });
+  }
+
+  // AIS targets
+  if(layers.ais){
+    const apos=[[W*0.40,H*0.38],[W*0.36,H*0.57],[W*0.50,H*0.53],[W*0.28,H*0.67],[W*0.58,H*0.42],[W*0.43,H*0.72]];
+    aisTargets.forEach((t,i)=>{
+      const [ax,ay]=apos[i];
+      const col=i===selectedAIS?'#ffff00':'#00aaff';
+      const ang=t.cog*Math.PI/180;
+      ctx.strokeStyle=col; ctx.lineWidth=i===selectedAIS?2:1.5;
+      ctx.save(); ctx.translate(ax,ay); ctx.rotate(ang);
+      ctx.beginPath(); ctx.moveTo(0,-10); ctx.lineTo(-5,6); ctx.lineTo(0,3); ctx.lineTo(5,6); ctx.closePath(); ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle=i===selectedAIS?'#ffff00':'#0088cc';
+      ctx.font=(i===selectedAIS?'bold 9px':'8px')+' Courier New';
+      ctx.fillText(t.name.split(' ')[0],ax+9,ay-4);
+      ctx.strokeStyle=col; ctx.lineWidth=0.8; ctx.setLineDash([2,2]);
+      ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(ax+Math.sin(ang)*t.sog*3,ay-Math.cos(ang)*t.sog*3); ctx.stroke();
+      ctx.setLineDash([]);
+    });
+  }
+
+  // EBL
+  if(layers.ebl){
+    const cx=W*0.47,cy=H*0.50, ang=eblAngle*Math.PI/180;
+    ctx.strokeStyle='#00ff88'; ctx.lineWidth=1; ctx.setLineDash([4,2]);
+    ctx.beginPath(); ctx.moveTo(cx,cy);
+    ctx.lineTo(cx+Math.sin(ang)*Math.max(W,H),cy-Math.cos(ang)*Math.max(W,H)); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // VRM
+  if(layers.vrm){
+    const cx=W*0.47,cy=H*0.50, r=vrmRange*42*(scaleIdx+1)/3;
+    ctx.strokeStyle='#00ff88'; ctx.lineWidth=1; ctx.setLineDash([4,2]);
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // PI
+  if(layers.pi){
+    ctx.strokeStyle='#88ff88'; ctx.lineWidth=0.8; ctx.setLineDash([2,4]);
+    for(let i=-1;i<=1;i++){ ctx.beginPath(); ctx.moveTo(0,H*0.5+i*42); ctx.lineTo(W,H*0.5+i*42); ctx.stroke(); }
+    ctx.setLineDash([]);
+  }
+  // Guard ring
+  if(layers.guard){
+    const cx=W*0.47,cy=H*0.50;
+    ctx.strokeStyle='#ffff00'; ctx.lineWidth=1; ctx.setLineDash([6,2]);
+    ctx.beginPath(); ctx.arc(cx,cy,65,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='rgba(255,255,0,0.04)'; ctx.beginPath(); ctx.arc(cx,cy,65,0,Math.PI*2); ctx.fill();
+  }
+  // Radar overlay
+  if(layers.radar){
+    [[W*0.40,H*0.37,24],[W*0.36,H*0.56,19],[W*0.50,H*0.51,16]].forEach(([rx,ry,rs])=>{
+      ctx.fillStyle='rgba(0,255,100,0.10)'; ctx.beginPath(); ctx.arc(rx,ry,rs,0,Math.PI*2); ctx.fill();
+    });
+  }
+
+  // Range rings
+  ctx.strokeStyle='rgba(0,80,0,0.35)'; ctx.lineWidth=0.5;
+  [40,80,120].forEach(r=>{ctx.beginPath();ctx.arc(W*0.47,H*0.5,r,0,Math.PI*2);ctx.stroke();});
+
+  // Grid
+  ctx.strokeStyle='rgba(0,50,80,0.35)'; ctx.lineWidth=0.4;
+  for(let i=0;i<W;i+=W/8){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,H);ctx.stroke();}
+  for(let j=0;j<H;j+=H/6){ctx.beginPath();ctx.moveTo(0,j);ctx.lineTo(W,j);ctx.stroke();}
+
+  // Own ship
+  const sx=W*0.47, sy=H*0.50;
+  const shipRot=headingMode==='NUP'?heading*Math.PI/180:0;
+  ctx.save(); ctx.translate(sx,sy); ctx.rotate(shipRot);
+  ctx.strokeStyle='#ffffff'; ctx.fillStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(0,-14); ctx.lineTo(-7,8); ctx.lineTo(0,4); ctx.lineTo(7,8); ctx.closePath();
+  ctx.fill(); ctx.stroke(); ctx.restore();
+
+  // COG vector
+  const cogAng=(headingMode==='NUP'?cog:0)*Math.PI/180;
+  ctx.strokeStyle='#ffffff'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx+Math.sin(cogAng)*52,sy-Math.cos(cogAng)*52); ctx.stroke();
+
+  // North arrow
+  ctx.save(); ctx.translate(W-22,52);
+  ctx.strokeStyle='#cccccc'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(0,-15); ctx.lineTo(0,15); ctx.stroke();
+  ctx.fillStyle='#cccccc'; ctx.beginPath(); ctx.moveTo(0,-15); ctx.lineTo(-4,-5); ctx.lineTo(4,-5); ctx.closePath(); ctx.fill();
+  ctx.font='bold 9px Courier New'; ctx.textAlign='center'; ctx.fillText('N',0,-18); ctx.restore();
+
+  // Depth labels
+  ctx.fillStyle='#336688'; ctx.font='8px Courier New'; ctx.textAlign='left';
+  ctx.fillText('15m',W*0.34,H*0.54);
+  ctx.fillText('30m',W*0.39,H*0.62);
+  ctx.fillText('50m',W*0.46,H*0.72);
+
+  // Chart label
+  ctx.fillStyle='rgba(0,100,100,0.8)'; ctx.font='9px Courier New'; ctx.textAlign='left';
+  ctx.fillText('ENC JP2-21000 \u2014 TOKYO WAN',8,H-26);
+}
+
+// Mouse tracking
+canvas.addEventListener('mousemove',e=>{
+  const rect=canvas.getBoundingClientRect();
+  const scX=canvas.width/rect.width, scY=canvas.height/rect.height;
+  const x=(e.clientX-rect.left)*scX, y=(e.clientY-rect.top)*scY;
+  const cx=canvas.width*0.47, cy=canvas.height*0.50;
+  const dx=x-cx, dy=-(y-cy);
+  const angle=((Math.atan2(dx,dy)*180/Math.PI)+360)%360;
+  const dist=Math.sqrt(dx*dx+dy*dy)/42;
+  document.getElementById('curBrg').textContent=String(Math.round(angle)).padStart(3,'0')+'°';
+  document.getElementById('curRng').textContent=dist.toFixed(2)+'nm';
+  const latOff=(y-cy)/500, lonOff=(x-cx)/500;
+  const lat=35.705-latOff, lon=139.763+lonOff;
+  const latStr=Math.abs(lat).toFixed(2).split('.')[0]+'°'+Math.abs(lat).toFixed(2).split('.')[1]+"'"+(lat>=0?'N':'S');
+  const lonStr=Math.abs(lon).toFixed(2).split('.')[0]+'°'+Math.abs(lon).toFixed(2).split('.')[1]+"'"+(lon>=0?'E':'W');
+  document.getElementById('curLat').textContent=latStr;
+  document.getElementById('curLon').textContent=lonStr;
+});
+
+// Tabs
+function switchTab(name){
+  ['sensor','ais','alert','conning'].forEach(t=>{
+    document.getElementById('panel-'+t).classList.toggle('active',t===name);
+    document.getElementById('tab-'+t).classList.toggle('active',t===name);
+  });
+  if(name==='ais') buildAISList();
+  if(name==='alert') buildAlertList();
+}
+
+// AIS
+function buildAISList(){
+  const el=document.getElementById('aisList'); el.innerHTML='';
+  aisTargets.forEach((t,i)=>{
+    const d=document.createElement('div');
+    d.className='ais-target'+(i===selectedAIS?' selected':'');
+    d.innerHTML=`<div class="ais-name">${t.name}</div>
+      <div class="ais-info">BRG:${String(t.brg).padStart(3,'0')}&deg; RNG:${t.range}nm SOG:${t.sog}kn</div>
+      <div class="ais-info">${navStatusTxt[t.navStatus]||'Unknown'}</div>`;
+    d.onclick=()=>{selectedAIS=i;buildAISList();showAISDetail(t);drawChart();};
+    el.appendChild(d);
+  });
+}
+function showAISDetail(t){
+  document.getElementById('aisDetailSection').style.display='block';
+  document.getElementById('aisDetail').innerHTML=`
+    <div class="rp-row"><span class="rp-key">NAME</span><span class="rp-val">${t.name}</span></div>
+    <div class="rp-row"><span class="rp-key">MMSI</span><span class="rp-val">${t.mmsi}</span></div>
+    <div class="rp-row"><span class="rp-key">CALL</span><span class="rp-val">${t.callsign}</span></div>
+    <div class="rp-row"><span class="rp-key">TYPE</span><span class="rp-val">${getShipType(t.type)}</span></div>
+    <div class="rp-row"><span class="rp-key">NAV STATUS</span><span class="rp-val">${navStatusTxt[t.navStatus]||'N/A'}</span></div>
+    <div class="rp-row"><span class="rp-key">COG</span><span class="rp-val">${t.cog}&deg;</span></div>
+    <div class="rp-row"><span class="rp-key">SOG</span><span class="rp-val">${t.sog}kn</span></div>
+    <div class="rp-row"><span class="rp-key">HDG</span><span class="rp-val">${t.hdg}&deg;</span></div>
+    <div class="rp-row"><span class="rp-key">LENGTH</span><span class="rp-val">${t.len}m</span></div>
+    <div class="rp-row"><span class="rp-key">DRAFT</span><span class="rp-val">${t.draft}m</span></div>
+    <div class="rp-row"><span class="rp-key">DEST</span><span class="rp-val">${t.dest}</span></div>
+    <div class="rp-row"><span class="rp-key">BRG</span><span class="rp-val">${String(t.brg).padStart(3,'0')}&deg;</span></div>
+    <div class="rp-row"><span class="rp-key">RANGE</span><span class="rp-val">${t.range}nm</span></div>`;
+}
+
+// Alerts
+function buildAlertList(){
+  const el=document.getElementById('alertList'); el.innerHTML='';
+  alerts.forEach(a=>{
+    const d=document.createElement('div'); d.className='alert-item';
+    d.innerHTML=`<div class="alert-dot dot-${a.level}"></div><div class="alert-text">${a.text}</div>`;
+    el.appendChild(d);
+  });
+}
+
+// Controls
+function changeScale(dir){
+  scaleIdx=Math.max(0,Math.min(scales.length-1,scaleIdx+dir));
+  document.getElementById('dispScale').textContent=scales[scaleIdx];
+  document.getElementById('scaleBar').textContent='|\u2014\u2014\u2014\u2014\u2014\u2014\u2014| '+scaleNm[scaleIdx]+' nm';
+  drawChart();
+}
+
+function setHeadingMode(mode){
+  headingMode=mode;
+  ['NUP','CUP','HUP','WUP'].forEach(m=>{ const b=document.getElementById('cb-'+m.toLowerCase()); if(b)b.classList.toggle('toggled',m===mode); });
+  document.getElementById('btnNup').classList.toggle('active',mode==='NUP');
+  document.getElementById('btnCup').classList.toggle('active',mode==='CUP');
+  document.getElementById('btnHup').classList.toggle('active',mode==='HUP');
+  const mm={NUP:'N-UP',CUP:'C-UP',HUP:'H-UP',WUP:'W-UP'};
+  document.getElementById('modeIndicator').textContent=mm[mode]+' \u00a0|\u00a0 '+motionMode+' \u00a0|\u00a0 ENC S-57';
+  drawChart();
+}
+
+function setMotion(m){
+  motionMode=m;
+  document.getElementById('btnTM').classList.toggle('active',m==='TM');
+  document.getElementById('btnRM').classList.toggle('active',m==='RM');
+  document.getElementById('cb-tm').classList.toggle('toggled',m==='TM');
+  document.getElementById('cb-rm').classList.toggle('toggled',m==='RM');
+  const mm={NUP:'N-UP',CUP:'C-UP',HUP:'H-UP',WUP:'W-UP'};
+  document.getElementById('modeIndicator').textContent=mm[headingMode]+' \u00a0|\u00a0 '+m+' \u00a0|\u00a0 ENC S-57';
+}
+
+function toggleLayer(name){
+  layers[name]=!layers[name];
+  const b=document.getElementById('btn'+name.toUpperCase()); if(b)b.classList.toggle('active',layers[name]);
+  drawChart();
+}
+
+function toggleMOB(){
+  mobActive=!mobActive;
+  document.getElementById('mobMarker').style.display=mobActive?'block':'none';
+  document.getElementById('btnMOB').style.background=mobActive?'#3a0000':'';
+  if(mobActive){
+    alerts.unshift({level:'alarm',text:"MOB ACTIVATED \u2014 35\u00b042.3'N 139\u00b045.8'E"});
+    document.getElementById('alertStrip').innerHTML='<span style="color:#ff4444">&#9679; MOB ACTIVE \u2014 MAN OVERBOARD</span>';
+  } else {
+    document.getElementById('alertStrip').innerHTML='<span id="alertMsg">&#9679; SYSTEM NORMAL</span>';
+  }
+}
+
+function silenceAlert(){
+  document.getElementById('alertStrip').style.borderColor='#669966';
+  document.getElementById('alertStrip').innerHTML='<span style="color:#669966">&#9679; BUZZER SILENCED</span>';
+}
+
+function ackAlert(){
+  if(alerts.length>0) alerts.shift(); buildAlertList();
+  document.getElementById('alertStrip').innerHTML='<span style="color:#00cc44">&#9679; ALERT ACKNOWLEDGED</span>';
+  setTimeout(()=>{document.getElementById('alertStrip').innerHTML='<span id="alertMsg">&#9679; SYSTEM NORMAL</span>';},2500);
+}
+
+function goHome(){ drawChart(); }
+
+let bLevel=3;
+function cycleBrightness(){
+  bLevel=(bLevel%5)+1;
+  document.getElementById('mainECDIS').style.filter='brightness('+(0.6+bLevel*0.08)+')';
+}
+
+function toggleHelp(){ document.getElementById('helpBox').classList.toggle('open'); }
+
+// Modals
+const modalTitles={
+  waypoint:'WAYPOINT / ROUTE LIST',chart:'CHART INFORMATION',daynight:'DAY / NIGHT MODE',
+  sensor:'SENSOR SELECTION',ownship:'OWN SHIP AIS INFO',pi:'PARALLEL INDEX LINES',
+  mob_detail:'MAN OVERBOARD',playback:'TRACK PLAYBACK',chart_maint:'CHART MAINTENANCE',about:'SYSTEM INFORMATION'
+};
+const modalContents={
+  waypoint:()=>`<div class="rp-title">ROUTE: TOKYO WAN APPROACH</div>`+
+    [['01','35°38.2\'N','139°40.1\'E','T135°','8.4nm','PASSED'],
+     ['02','35°41.5\'N','139°44.6\'E','T047°','4.1nm','PASSED'],
+     ['03','35°43.0\'N','139°46.2\'E','T023°','2.2nm','ACTIVE'],
+     ['04','35°45.8\'N','139°47.5\'E','T015°','3.0nm','AHEAD'],
+     ['05','35°48.0\'N','139°48.3\'E','T008°','2.3nm','AHEAD'],
+     ['06','35°50.2\'N','139°49.0\'E','T005°','—','DEST']].map((w,i)=>
+      `<div style="border:1px solid #1a3a1a;padding:4px;margin:2px 0;background:${i===2?'#001a00':'#080f08'};font-size:9px;">
+        <div style="color:${i===2?'#00ff55':i<2?'#336633':'#669966'}">${i===2?'\u25b6 ':i<2?'\u2713 ':'  '}WPT ${w[0]} &mdash; ${w[5]}</div>
+        <div class="rp-row"><span class="rp-key">POS</span><span class="rp-val">${w[1]} ${w[2]}</span></div>
+        <div class="rp-row"><span class="rp-key">COURSE</span><span class="rp-val">${w[3]}</span></div>
+        <div class="rp-row"><span class="rp-key">LEG DIST</span><span class="rp-val">${w[4]}</span></div>
+      </div>`).join('')+
+    '<div class="modal-note">Max 512 WPTs per route. Up to 50 routes stored on SSD.</div>',
+
+  chart:()=>`<div class="rp-title">CHART INFO</div>
+    <div class="rp-row"><span class="rp-key">TYPE</span><span class="rp-val">ENC S-57 Ed.3.1</span></div>
+    <div class="rp-row"><span class="rp-key">CELL ID</span><span class="rp-val">JP2-21000</span></div>
+    <div class="rp-row"><span class="rp-key">AREA</span><span class="rp-val">TOKYO WAN</span></div>
+    <div class="rp-row"><span class="rp-key">EDITION</span><span class="rp-val">6 / 2024-11-01</span></div>
+    <div class="rp-row"><span class="rp-key">UPDATE</span><span class="rp-val">2024-12-15</span></div>
+    <div class="rp-row"><span class="rp-key">SCALE</span><span class="rp-val">${scales[scaleIdx]}</span></div>
+    <div class="rp-row"><span class="rp-key">IHO STD</span><span class="rp-val">S-52 Ed.6.1</span></div>
+    <div class="rp-row"><span class="rp-key">PLIB</span><span class="rp-val">Ed.4.0.1</span></div>
+    <div class="rp-row"><span class="rp-key">SAFETY CTR</span><span class="rp-val">15.0m</span></div>
+    <div class="rp-row"><span class="rp-key">DANGER DEPTH</span><span class="rp-val">10.0m</span></div>
+    <div class="modal-note">IMO MSC.232(82) compliant ECDIS. S-63 encrypted ENC supported.</div>`,
+
+  daynight:()=>{
+    const modes=[['DAY','Full brightness','#ccffcc'],['DUSK','Reduced amber','#ffeeaa'],['NIGHT','Night vision','#ffaaaa'],['DAWN','Dawn setting','#aaddff'],['BRIGHT','Max brightness','#ffffff']];
+    return `<div class="rp-title">SELECT COLOR MODE</div>`+
+      modes.map(([m,desc,col])=>`<button onclick="setDN('${m}')" style="display:block;width:100%;margin:3px 0;padding:6px;background:${dnMode===m?'#003300':'#0a150a'};border:1px solid ${dnMode===m?'#00cc44':'#1a3a1a'};color:${dnMode===m?'#00ff55':'#669966'};cursor:pointer;font-family:Courier New;font-size:10px;text-align:left;">${dnMode===m?'\u25b6 ':'  '}${m} &mdash; ${desc}</button>`).join('')+
+      '<div class="modal-note">Corresponds to [DAY NIGHT] key. Cycles 5 levels to suit bridge ambient light.</div>';},
+
+  sensor:()=>`<div class="rp-title">SENSOR SELECTION / STATUS</div>
+    <div style="color:#669966;font-size:9px;margin:5px 0 2px;">HEADING</div>
+    <div class="rp-row"><span class="rp-key">SELECTED</span><span class="rp-val">GYRO 1</span></div>
+    <div class="rp-row"><span class="rp-key">GYRO 1</span><span class="rp-val normal">NORMAL</span></div>
+    <div class="rp-row"><span class="rp-key">GYRO 2</span><span class="rp-val warn">STANDBY</span></div>
+    <div class="rp-row"><span class="rp-key">MAG</span><span class="rp-val warn">NOT CONNECTED</span></div>
+    <div style="color:#669966;font-size:9px;margin:5px 0 2px;">SPEED</div>
+    <div class="rp-row"><span class="rp-key">STW SRC</span><span class="rp-val">LOG 1 (2-AXIS)</span></div>
+    <div class="rp-row"><span class="rp-key">SOG SRC</span><span class="rp-val">GPS 1</span></div>
+    <div style="color:#669966;font-size:9px;margin:5px 0 2px;">POSITION</div>
+    <div class="rp-row"><span class="rp-key">GPS 1</span><span class="rp-val normal">NORMAL</span></div>
+    <div class="rp-row"><span class="rp-key">GPS 2</span><span class="rp-val warn">STANDBY</span></div>
+    <div class="rp-row"><span class="rp-key">RAIM</span><span class="rp-val">IN USE</span></div>
+    <div class="rp-row"><span class="rp-key">DR</span><span class="rp-val normal">OK</span></div>
+    <div class="modal-note">BG colours: normal=green, yellow=degraded, red=failed. Two-axis log cannot detect leeway.</div>`,
+
+  ownship:()=>`<div class="rp-title">OWN SHIP AIS INFORMATION</div>
+    <div class="rp-row"><span class="rp-key">MMSI</span><span class="rp-val">431000001</span></div>
+    <div class="rp-row"><span class="rp-key">SHIP NAME</span><span class="rp-val">TRAINING VESSEL</span></div>
+    <div class="rp-row"><span class="rp-key">CALL SIGN</span><span class="rp-val">JKTR</span></div>
+    <div class="rp-row"><span class="rp-key">IMO NO.</span><span class="rp-val">123456789</span></div>
+    <div class="rp-row"><span class="rp-key">TYPE</span><span class="rp-val">70 &mdash; Cargo</span></div>
+    <div class="rp-row"><span class="rp-key">LENGTH</span><span class="rp-val">150m</span></div>
+    <div class="rp-row"><span class="rp-key">BEAM</span><span class="rp-val">24m</span></div>
+    <div class="rp-row"><span class="rp-key">DRAFT</span><span class="rp-val">7.5m</span></div>
+    <div class="rp-row"><span class="rp-key">DESTINATION</span><span class="rp-val">YOKOHAMA</span></div>
+    <div class="rp-row"><span class="rp-key">NAV STATUS</span><span class="rp-val">Under Way Engine</span></div>
+    <div class="rp-row"><span class="rp-key">AIS CLASS</span><span class="rp-val">CLASS A</span></div>`,
+
+  pi:()=>`<div class="rp-title">PARALLEL INDEX LINES</div>
+    <div class="rp-row"><span class="rp-key">PI 1 BRG</span><span class="rp-val">047&deg;</span></div>
+    <div class="rp-row"><span class="rp-key">PI 1 DIST</span><span class="rp-val">0.5nm PORT</span></div>
+    <div class="rp-row"><span class="rp-key">PI 2 BRG</span><span class="rp-val">047&deg;</span></div>
+    <div class="rp-row"><span class="rp-key">PI 2 DIST</span><span class="rp-val">1.0nm PORT</span></div>
+    <div class="modal-note">Press [PI] key to toggle PI on/off. Hold [PI] key to activate floating PI mode. Up to 6 PI lines supported. Useful for clearing distance monitoring.</div>`,
+
+  mob_detail:()=>`<div class="rp-title">MAN OVERBOARD (MOB)</div>
+    <div class="rp-row"><span class="rp-key">STATUS</span><span class="rp-val" style="color:${mobActive?'#ff4444':'#669966'}">${mobActive?'&#9679; ACTIVE':'&#9711; INACTIVE'}</span></div>
+    <div class="rp-row"><span class="rp-key">LAT</span><span class="rp-val">35&deg;42.3'N</span></div>
+    <div class="rp-row"><span class="rp-key">LON</span><span class="rp-val">139&deg;45.8'E</span></div>
+    <div class="rp-row"><span class="rp-key">BRG TO MOB</span><span class="rp-val">000&deg;</span></div>
+    <div class="rp-row"><span class="rp-key">RNG TO MOB</span><span class="rp-val">0.00nm</span></div>
+    <div class="rp-row"><span class="rp-key">TIME SET</span><span class="rp-val">${new Date().toUTCString().slice(17,25)} UTC</span></div>
+    <div class="modal-note">MOB marks own ship position at activation. Press MOB button to activate. Hold [MOB] key to clear marker. Symbol flashes on chart.</div>`,
+
+  playback:()=>`<div class="rp-title">OWN SHIP PLAYBACK</div>
+    <div class="rp-row"><span class="rp-key">LOG MEDIA</span><span class="rp-val">SSD INTERNAL</span></div>
+    <div class="rp-row"><span class="rp-key">LOG FROM</span><span class="rp-val">2025-01-01 00:00</span></div>
+    <div class="rp-row"><span class="rp-key">LOG TO</span><span class="rp-val">NOW</span></div>
+    <div class="rp-row"><span class="rp-key">PLAYBACK SPD</span><span class="rp-val">1x</span></div>
+    <div class="rp-row"><span class="rp-key">TRACK INTVL</span><span class="rp-val">1 min</span></div>
+    <div class="modal-note">Navigation data is logged continuously to the internal SSD. Use playback to review sailed routes and verify navigation decisions.</div>`,
+
+  chart_maint:()=>`<div class="rp-title">CHART MAINTENANCE</div>
+    <div class="rp-row"><span class="rp-key">S-57 UPDATE</span><span class="rp-val">2024-12-15</span></div>
+    <div class="rp-row"><span class="rp-key">C-MAP Ed.3</span><span class="rp-val">Professional+</span></div>
+    <div class="rp-row"><span class="rp-key">PRIMAR</span><span class="rp-val">ECDIS SVC</span></div>
+    <div class="rp-row"><span class="rp-key">ARCS</span><span class="rp-val">NOT LOADED</span></div>
+    <div class="rp-row"><span class="rp-key">AIO</span><span class="rp-val">LOADED</span></div>
+    <div class="rp-row"><span class="rp-key">S-63 ENCRYPT</span><span class="rp-val">SUPPORTED</span></div>
+    <div class="modal-note">S-57 charts can be updated via USB or network. Supports S-63 encrypted ENC. C-MAP and ARCS cannot be displayed concurrently with S-57.</div>`,
+
+  about:()=>`<div class="rp-title">SYSTEM INFORMATION</div>
+    <div class="rp-row"><span class="rp-key">MODEL</span><span class="rp-val">JAN-9201</span></div>
+    <div class="rp-row"><span class="rp-key">MANUFACTURER</span><span class="rp-val">JRC Co., Ltd.</span></div>
+    <div class="rp-row"><span class="rp-key">IMO STD</span><span class="rp-val">MSC.232(82)</span></div>
+    <div class="rp-row"><span class="rp-key">IHO S-52</span><span class="rp-val">Ed.6.1</span></div>
+    <div class="rp-row"><span class="rp-key">PLIB</span><span class="rp-val">Ed.4.0.1</span></div>
+    <div class="rp-row"><span class="rp-key">ALERT STD</span><span class="rp-val">MSC.302(87)</span></div>
+    <div class="rp-row"><span class="rp-key">DISPLAY</span><span class="rp-val">26-inch WUXGA</span></div>
+    <div class="rp-row"><span class="rp-key">VIRUS PROT</span><span class="rp-val">Trend Micro</span></div>
+    <div class="rp-row"><span class="rp-key">SIMULATOR</span><span class="rp-val">CASY SIMULATIONS</span></div>
+    <div class="rp-row"><span class="rp-key">VERSION</span><span class="rp-val">Training v1.0</span></div>
+    <div class="modal-note" style="color:#ffdd00;">CASY SIMULATIONS &mdash; For training use only. Not for actual navigation.</div>`
+};
+
+function openModal(name){
+  document.getElementById('modalTitle').textContent=modalTitles[name]||name.toUpperCase();
+  document.getElementById('modalContent').innerHTML=(modalContents[name]||(() => '<div>No data</div>'))();
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); }
+canvas.addEventListener('click',closeModal);
+
+function setDN(mode){
+  dnMode=mode;
+  document.getElementById('dnBtn').textContent=mode;
+  const f={DAY:'brightness(1)',DUSK:'brightness(0.82) sepia(0.25)',NIGHT:'brightness(0.45) hue-rotate(25deg)',DAWN:'brightness(0.68) sepia(0.12)',BRIGHT:'brightness(1.25)'};
+  document.getElementById('mainECDIS').style.filter=f[mode]||'';
+  closeModal();
+}
+
+// ═══════════════════════════════════════════════════
+// ENGINE TELEGRAPH
+// ═══════════════════════════════════════════════════
+const TG_ZONES = [
+  { label:'FULL\nAHEAD',  color:'#003a00', textColor:'#00ff55', rpmTarget:90,  posY:0   },
+  { label:'HALF\nAHEAD',  color:'#004400', textColor:'#00ee44', rpmTarget:65,  posY:18  },
+  { label:'SLOW\nAHEAD',  color:'#003300', textColor:'#00cc33', rpmTarget:40,  posY:36  },
+  { label:'DEAD\nSLOW A', color:'#002200', textColor:'#009922', rpmTarget:20,  posY:54  },
+  { label:'STOP',          color:'#220000', textColor:'#ff4444', rpmTarget:0,   posY:72  },
+  { label:'DEAD\nSLOW A', color:'#1a1a00', textColor:'#ffaa00', rpmTarget:-20, posY:90  },
+  { label:'SLOW\nAST',    color:'#332200', textColor:'#ffcc00', rpmTarget:-40, posY:108 },
+  { label:'HALF\nAST',    color:'#443300', textColor:'#ffdd00', rpmTarget:-65, posY:126 },
+  { label:'FULL\nAST',    color:'#553300', textColor:'#ffee00', rpmTarget:-90, posY:144 },
+];
+// Simplified zones for the 108px tall body — 6 zones
+const TG_DISPLAY = [
+  { label:'FULL AHEAD',   color:'#003a00', textColor:'#00ff55', rpmTarget:90  },
+  { label:'HALF AHEAD',   color:'#004400', textColor:'#00dd44', rpmTarget:65  },
+  { label:'SLOW AHEAD',   color:'#002a00', textColor:'#00aa22', rpmTarget:40  },
+  { label:'STOP',         color:'#2a0000', textColor:'#ff4444', rpmTarget:0   },
+  { label:'SLOW ASTERN',  color:'#332200', textColor:'#ffcc00', rpmTarget:-40 },
+  { label:'HALF ASTERN',  color:'#3a2800', textColor:'#ffdd00', rpmTarget:-65 },
+  { label:'FULL ASTERN',  color:'#442800', textColor:'#ffee00', rpmTarget:-90 },
+];
+let currentTgIdx = 0; // FULL AHEAD
+let tgRpmActual = 62;
+
+function buildTelegraph(){
+  const body = document.getElementById('telegraphBody');
+  const zoneH = Math.floor(108 / TG_DISPLAY.length);
+  body.innerHTML = '';
+  TG_DISPLAY.forEach((z, i) => {
+    const div = document.createElement('div');
+    div.className = 'tg-zone' + (i===currentTgIdx?' tg-active':'');
+    div.id = 'tgZone'+i;
+    div.style.cssText = `height:${zoneH}px;top:${i*zoneH}px;position:absolute;left:0;right:0;
+      background:${z.color};color:${z.textColor};font-size:7px;font-weight:bold;
+      display:flex;align-items:center;justify-content:center;cursor:pointer;
+      border-bottom:1px solid #111;letter-spacing:0.3px;`;
+    div.textContent = z.label;
+    div.onclick = () => setTelegraph(i);
+    body.appendChild(div);
+  });
+  // Pointer
+  const ptr = document.createElement('div');
+  ptr.className = 'tg-pointer';
+  ptr.id = 'tgPointer';
+  const zH = 108/TG_DISPLAY.length;
+  ptr.style.top = (currentTgIdx * zH + zH/2 - 6) + 'px';
+  body.appendChild(ptr);
+}
+
+function setTelegraph(idx){
+  currentTgIdx = idx;
+  TG_DISPLAY.forEach((z, i) => {
+    const el = document.getElementById('tgZone'+i);
+    if(el) el.classList.toggle('tg-active', i===idx);
+  });
+  const zH = 108/TG_DISPLAY.length;
+  const ptr = document.getElementById('tgPointer');
+  if(ptr) ptr.style.top = (idx * zH + zH/2 - 6) + 'px';
+  const z = TG_DISPLAY[idx];
+  document.getElementById('tgOrderDisplay').textContent = z.label;
+  logHelmOrder('ENGINE: ' + z.label, 'OOW');
+}
+
+function updateTelegraphRPM(){
+  const targetRPM = Math.max(0, TG_DISPLAY[currentTgIdx].rpmTarget);
+  tgRpmActual += (targetRPM - tgRpmActual) * 0.05;
+  document.getElementById('tgRpmDisplay').textContent = 'RPM: ' + Math.abs(tgRpmActual).toFixed(0);
+}
+
+// ═══════════════════════════════════════════════════
+// STEERING WHEEL
+// ═══════════════════════════════════════════════════
+let wheelAngle = 0;       // visual rotation degrees
+let targetRudder = 0;     // target rudder angle
+let isDraggingWheel = false;
+let lastMouseAngle = null;
+let currentHelmOrder = 'MIDSHIPS';
+
+const wheelSVG = document.getElementById('wheelSVG');
+const wheelContainer = document.getElementById('wheelContainer');
+
+function getMouseAngle(e, rect){
+  const cx = rect.left + rect.width/2;
+  const cy = rect.top + rect.height/2;
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return Math.atan2(clientY - cy, clientX - cx) * 180 / Math.PI;
+}
+
+wheelContainer.addEventListener('mousedown', e => {
+  isDraggingWheel = true;
+  lastMouseAngle = getMouseAngle(e, wheelContainer.getBoundingClientRect());
+  e.preventDefault();
+});
+wheelContainer.addEventListener('touchstart', e => {
+  isDraggingWheel = true;
+  lastMouseAngle = getMouseAngle(e, wheelContainer.getBoundingClientRect());
+  e.preventDefault();
+}, {passive:false});
+document.addEventListener('mousemove', e => {
+  if(!isDraggingWheel) return;
+  const rect = wheelContainer.getBoundingClientRect();
+  const angle = getMouseAngle(e, rect);
+  let delta = angle - lastMouseAngle;
+  if(delta > 180) delta -= 360;
+  if(delta < -180) delta += 360;
+  wheelAngle = (wheelAngle + delta) % 360;
+  lastMouseAngle = angle;
+  targetRudder = Math.max(-35, Math.min(35, wheelAngle / 4));
+  updateWheelVisual();
+});
+document.addEventListener('touchmove', e => {
+  if(!isDraggingWheel) return;
+  const rect = wheelContainer.getBoundingClientRect();
+  const angle = getMouseAngle(e, rect);
+  let delta = angle - lastMouseAngle;
+  if(delta > 180) delta -= 360;
+  if(delta < -180) delta += 360;
+  wheelAngle = (wheelAngle + delta) % 360;
+  lastMouseAngle = angle;
+  targetRudder = Math.max(-35, Math.min(35, wheelAngle / 4));
+  updateWheelVisual();
+}, {passive:false});
+document.addEventListener('mouseup', () => { isDraggingWheel = false; });
+document.addEventListener('touchend', () => { isDraggingWheel = false; });
+
+function updateWheelVisual(){
+  const spokes = document.getElementById('wheelSpokes');
+  if(spokes) spokes.style.transform = `rotate(${wheelAngle}deg)`;
+  spokes && (spokes.style.transformOrigin = '48px 48px');
+  updateHelmReadout();
+}
+
+function updateHelmReadout(){
+  const r = targetRudder;
+  let label;
+  if(Math.abs(r) < 2) label = 'MIDSHIPS';
+  else if(r > 0 && r < 12) label = 'STBD 10°';
+  else if(r >= 12 && r < 24) label = 'STBD 20°';
+  else if(r >= 24) label = 'HARD STBD';
+  else if(r < 0 && r > -12) label = 'PORT 10°';
+  else if(r <= -12 && r > -24) label = 'PORT 20°';
+  else label = 'HARD PORT';
+  document.getElementById('helmRudderReadout').textContent = label + '  ' + (r>=0?'+':'') + r.toFixed(1) + '°';
+}
+
+function giveHelmOrder(orderText, key){
+  // Update active button
+  document.querySelectorAll('.helm-order-btn').forEach(b => b.classList.remove('active-order'));
+  const orderMap = {
+    'hard-stbd': 35, 'stbd-20': 20, 'stbd-10': 10,
+    'mid': 0, 'port-10': -10, 'port-20': -20, 'hard-port': -35
+  };
+  const tgt = orderMap[key] ?? 0;
+  targetRudder = tgt;
+  wheelAngle = tgt * 4;
+  updateWheelVisual();
+  // Highlight correct button
+  const btn = document.getElementById('ho-'+key.replace(/-/g,''));
+  if(btn) btn.classList.add('active-order');
+  currentHelmOrder = orderText;
+  logHelmOrder('HELM: ' + orderText, 'PILOT');
+}
+// Fix button IDs after render
+['hard-stbd','stbd-20','stbd-10','mid','port-10','port-20','hard-port'].forEach(k=>{
+  const safeid = 'ho-'+k.replace(/-/g,'');
+  document.querySelectorAll('.helm-order-btn').forEach(b=>{
+    if(b.getAttribute('onclick') && b.getAttribute('onclick').includes("'"+k+"'")){
+      b.id = safeid;
+    }
+  });
+});
+
+// HELM LOG
+let helmLog = [];
+function logHelmOrder(cmd, who){
+  const t = new Date();
+  const p = n=>String(n).padStart(2,'0');
+  const ts = p(t.getUTCHours())+':'+p(t.getUTCMinutes())+':'+p(t.getUTCSeconds());
+  helmLog.unshift({ts, cmd, who});
+  if(helmLog.length > 20) helmLog.pop();
+  renderHelmLog();
+}
+function renderHelmLog(){
+  const el = document.getElementById('helmOrdersLog');
+  if(!el) return;
+  el.innerHTML = helmLog.map(e=>
+    `<div class="helm-log-entry">
+      <span class="hle-time">${e.ts}</span>
+      <span class="hle-cmd">${e.cmd}</span>
+      <span class="hle-who">${e.who}</span>
+    </div>`).join('');
+}
+
+// Update bridge console gauges
+function updateBridgeConsole(){
+  const rpmPct = Math.min(100, ((rpm-40)/40*100));
+  const bcStbd = document.getElementById('bc-engStbd');
+  const bcPort = document.getElementById('bc-engPort');
+  if(bcStbd) bcStbd.style.width = rpmPct+'%';
+  if(bcPort) bcPort.style.width = Math.max(0,rpmPct-3)+'%';
+  const sv = document.getElementById('bc-engStbdVal');
+  const pv = document.getElementById('bc-engPortVal');
+  if(sv) sv.textContent = Math.round(rpm)+' RPM';
+  if(pv) pv.textContent = Math.round(rpm-2)+' RPM';
+  const bsog = document.getElementById('bc-sog');
+  const bhdg = document.getElementById('bc-hdg');
+  const brot = document.getElementById('bc-rot');
+  if(bsog) bsog.textContent = sog.toFixed(1)+' kn';
+  if(bhdg) bhdg.textContent = String(Math.round(heading)).padStart(3,'0')+'°';
+  if(brot) brot.textContent = (rudder>0?'+':'')+(rudder*0.1).toFixed(1)+'°/m';
+  // Nudge rudder toward target
+  rudder += (targetRudder - rudder) * 0.08;
+  const rPct = Math.abs(rudder)/35*50;
+  const rf = document.getElementById('bc-rudderFill');
+  const rt = document.getElementById('bc-rudderText');
+  if(rf){
+    if(rudder>=0){rf.style.left='50%';rf.style.width=rPct+'%';rf.style.background='#00aa55';}
+    else{rf.style.left=(50-rPct)+'%';rf.style.width=rPct+'%';rf.style.background='#aa5500';}
+  }
+  if(rt) rt.textContent = rudder.toFixed(1)+'°';
+  updateTelegraphRPM();
+}
+
+// Main loop
+function tick(){
+  frame++;
+  if(frame%60===0) updateClock();
+  if(frame%8===0){ animateSensors(); drawChart(); updateBridgeConsole(); }
+  if(frame%120===0){
+    const msgs=['&#9679; SYSTEM NORMAL','&#9679; AIS: 6 TARGETS ACTIVE','&#9679; GPS POSITION OK','&#9679; ROUTE MONITORING ON'];
+    const strip=document.getElementById('alertStrip');
+    if(!mobActive&&strip) strip.innerHTML='<span>'+msgs[Math.floor(frame/120)%msgs.length]+'</span>';
+  }
+  requestAnimationFrame(tick);
+}
+
+window.addEventListener('resize',()=>{ resizeCanvas(); });
+window.addEventListener('load',()=>{
+  resizeCanvas(); updateClock(); buildAISList(); buildAlertList(); tick();
+  setHeadingMode('NUP'); setMotion('RM');
+  buildTelegraph();
+  logHelmOrder('HELM: MIDSHIPS', 'PILOT');
+  logHelmOrder('ENGINE: FULL AHEAD', 'MASTER');
+});
+</script>
+</body>
+</html>
